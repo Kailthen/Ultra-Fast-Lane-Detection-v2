@@ -5,6 +5,7 @@ from utils.common import merge_config, get_model
 import tqdm
 import torchvision.transforms as transforms
 from data.dataset import LaneTestDataset
+from PIL import Image
 
 def pred2coords(pred, row_anchor, col_anchor, local_width = 1, original_image_width = 1640, original_image_height = 590):
     batch_size, num_grid_row, num_cls_row, num_lane_row = pred['loc_row'].shape
@@ -64,16 +65,11 @@ if __name__ == "__main__":
     dist_print('start testing...')
     assert cfg.backbone in ['18','34','50','101','152','50next','101next','50wide','101wide']
 
-    if cfg.dataset == 'CULane':
-        cls_num_per_lane = 18
-    elif cfg.dataset == 'Tusimple':
-        cls_num_per_lane = 56
-    else:
-        raise NotImplementedError
-
     net = get_model(cfg)
-
-    state_dict = torch.load(cfg.test_model, map_location='cpu')['model']
+    if cfg.test_model.startswith("http"):
+        state_dict = torch.hub.load_state_dict_from_url(cfg.test_model, map_location='cpu')['model']
+    else:
+        state_dict = torch.load(cfg.test_model, map_location='cpu')['model']
     compatible_state_dict = {}
     for k, v in state_dict.items():
         if 'module.' in k:
@@ -97,6 +93,12 @@ if __name__ == "__main__":
         splits = ['test.txt']
         datasets = [LaneTestDataset(cfg.data_root,os.path.join(cfg.data_root, split),img_transform = img_transforms, crop_size = cfg.train_height) for split in splits]
         img_w, img_h = 1280, 720
+    elif cfg.dataset == 'CurveLanes':
+        splits = ['infer.txt']
+        # cfg.data_root="/media/work/2t/a4d/argo2_parsed/train012/e65e405c-8aea-30f5-a926-1e0fbbeefb9f.0.156/ring_front_center_rectified/"
+        cfg.data_root="/media/work/2t/a4d/argo2_parsed/train012/e65e405c-8aea-30f5-a926-1e0fbbeefb9f.0.156/ring_rear_left/"
+        datasets = [LaneTestDataset(cfg.data_root,f"{cfg.data_root}/images.txt",img_transform = img_transforms, crop_size = cfg.train_height) for split in splits]
+        img_w, img_h = 2048, 1550
     else:
         raise NotImplementedError
     for split, dataset in zip(splits, datasets):
